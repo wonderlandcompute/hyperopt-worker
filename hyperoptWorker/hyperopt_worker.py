@@ -46,7 +46,7 @@ PREDEFINED_METRICS = {
 
 
 MODEL_FILE = "model.pickle"
-SLEEP_TIME = 1  # seconds
+SLEEP_TIME = 5  # seconds
 stub = new_client()
 file_service = FileService(account_name='mylake', account_key='nTYA+KhHEIuy2DVyG8uGuNev3qKGJ8Qm975hCkMgm+hGc7AW17RhnygFTKSNho5Iu8s3zwYcqxgrmte0tROBog==')
 os.environ["AFSSHARE"] = "myshare"
@@ -141,7 +141,6 @@ def process_job(job):
             "error_type": str(type(ex)),
             "error_description": str(ex),
         }
-        job.status = wonderland_pb2.Job.FAILED
         return
 
     upload(pickle.dumps(res_model), out_folder / 'model.pickle')
@@ -183,6 +182,8 @@ def main():
             try:
                 process_job(job)
             except Exception as exc:
+                job.status = wonderland_pb2.Job.FAILED
+                stub.ModifyJob(job)
                 print(exc)
                 print("Error occured")
             print("Processed:\n{}".format(job))

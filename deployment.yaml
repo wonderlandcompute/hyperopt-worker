@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyperopt-worker-deployment
+  labels:
+    app: hyperopt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hyperopt
+  template:
+    metadata:
+      labels:
+        app: hyperopt
+    spec:
+      containers:
+      - name: hyperopt-worker
+        image: musinov/hyperopt-worker
+        imagePullPolicy: Always
