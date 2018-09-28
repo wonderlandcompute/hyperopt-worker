@@ -4,6 +4,7 @@ import base64
 import os
 import json
 import shutil
+import traceback
 import pandas as pd
 import pickle
 import numpy as np
@@ -44,14 +45,15 @@ PREDEFINED_METRICS = {
     # "r2": r2_score,
 }
 
-
 MODEL_FILE = "model.pickle"
 SLEEP_TIME = 5  # seconds
 stub = new_client()
-file_service = FileService(account_name='mylake', account_key='nTYA+KhHEIuy2DVyG8uGuNev3qKGJ8Qm975hCkMgm+hGc7AW17RhnygFTKSNho5Iu8s3zwYcqxgrmte0tROBog==')
+file_service = FileService(account_name='mylake',
+                           account_key='nTYA+KhHEIuy2DVyG8uGuNev3qKGJ8Qm975hCkMgm+hGc7AW17RhnygFTKSNho5Iu8s3zwYcqxgrmte0tROBog==')
 os.environ["AFSSHARE"] = "myshare"
 os.environ["REPO_STORAGE"] = "~/repo-storage-worker"
 repo_storage = Path(os.getenv('REPO_STORAGE')).expanduser()
+
 
 def get_metric_function(metric):
     """Returns a predefined metric function object if metric corresponds to one,
@@ -96,6 +98,7 @@ def load_data(csv_path):
     train_objects = dataframe.drop(['y'], axis=1).values
     return train_target, train_objects
 
+
 def process_job(job):
     input = json.loads(job.input)
     out_folder = Path(input["model_path"]).parent
@@ -107,7 +110,6 @@ def process_job(job):
         with open(model_path, "rb") as f:
             models = json.load(f)
         cv = dataset.cv_split(models['cv'])
-        model_objects = []
 
         for model in models['models']:
 
@@ -117,7 +119,7 @@ def process_job(job):
                                            params=model.get('params'),
                                            cv=cv,
                                            metrics=[PREDEFINED_METRICS.get(metric)() for metric in models['metrics']],
-                                           verbose=None)
+                                           verbose=False)
 
                 res_model = MODEL_CLASSES[model['type']](params=model.get('params')).fit(dataset)
                 # with open(out_folder / MODEL_FILE, 'wb') as f:
@@ -134,30 +136,32 @@ def process_job(job):
         if model['type'] in (MODEL_CLASSES['CtBClassifier'], MODEL_CLASSES['CtBRegressor']):
             cleanup_catboost()
 
-    except Exception as ex:
-        result = {
-            "status": STATUS_FAIL,
-            "error": 1,
-            "error_type": str(type(ex)),
-            "error_description": str(ex),
-        }
+        upload(pickle.dumps(res_model), out_folder / 'model.pickle')
+        upload(json.dumps(result).encode(), out_folder / 'output.json')
+
+        job.output = json.dumps({'output': str(out_folder / 'output.json'),
+                                 'result_model_path': str(out_folder / 'model.pickle')})
+
+        job.status = Job.COMPLETED
+        stub.ModifyJob(job)
+    except Exception as exc:
+        print(str(exc))
+        traceback.print_exc()
+        log = "Error:\n" + str(exc) + "\n\n\nTrace:\n" + traceback.format_exc()
+        upload(str(log).encode(), out_folder / 'error.log')
+        job.output = json.dumps({'error': str(out_folder / 'error.log')})
+        job.status = wonderland_pb2.Job.FAILED
+        stub.ModifyJob(job)
         return
 
-    upload(pickle.dumps(res_model), out_folder / 'model.pickle')
-    upload(json.dumps(result).encode(), out_folder / 'output.json')
+    return
 
-    job.output = json.dumps({'output': str(out_folder / 'output.json'),
-                             'result_model_path': str(out_folder / 'model.pickle')})
-
-    job.status = Job.COMPLETED
-    stub.ModifyJob(job)
-    return result
 
 def download(afs_path):
     afs_path = Path(afs_path)
     local_path = repo_storage / afs_path
     if local_path.exists():
-        print("Already downloaded! ")
+        print("Wow, the data is already here. Getting the data from the pantry.")
         return local_path
     else:
         path_to_folder = local_path.parent
@@ -168,11 +172,13 @@ def download(afs_path):
                                   file_path=local_path)
     return local_path
 
+
 def upload(bytes, afs_path):
     file_service.create_file_from_bytes(share_name=os.getenv("AFSSHARE"),
-                                            directory_name=afs_path.parent,
-                                            file_name=afs_path.name,
-                                            file=bytes)
+                                        directory_name=afs_path.parent,
+                                        file_name=afs_path.name,
+                                        file=bytes)
+
 
 def main():
     while True:
@@ -182,10 +188,8 @@ def main():
             try:
                 process_job(job)
             except Exception as exc:
-                job.status = wonderland_pb2.Job.FAILED
-                stub.ModifyJob(job)
+                print("Error!\n")
                 print(exc)
-                print("Error occured")
             print("Processed:\n{}".format(job))
 
 
