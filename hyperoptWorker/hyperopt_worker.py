@@ -186,6 +186,7 @@ def main():
         pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
         for job in pulled_jobs.jobs:
             try:
+                print("Gotcha!Learning...")
                 process_job(job)
             except Exception as exc:
                 print("Error!\n")

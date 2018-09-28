@@ -34,7 +34,7 @@ RUN apk --update  --repository http://dl-4.alpinelinux.org/alpine/edge/community
     && conda clean --all --yes \
     && pip --no-cache-dir install scikit-learn numpy scipy pandas statsmodels \
     && pip --no-cache-dir install git+https://github.com/yandexdataschool/modelgym.git \
-    && pip --no-cache-dir install lightgbm \
+    && pip --no-cache-dir install lightgbm==2.0.4 \
     && apk add --update --no-cache \
     --virtual=.build-dependencies && \
     mkdir /src && \
