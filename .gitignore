@@ -8,3 +8,13 @@ config\.yaml
 hyperoptWorker\.egg-info/
 
 hyperoptWorker/__pycache__/
+
+hyperoptWorker/train/
+
+hyperoptWorker/test/
+
+hyperoptWorker/time_left\.tsv
+
+hyperoptWorker/learn_error\.tsv
+
+hyperoptWorker/meta\.tsv

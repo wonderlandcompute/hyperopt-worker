@@ -183,7 +183,10 @@ def upload(bytes, afs_path):
 def main():
     while True:
         time.sleep(SLEEP_TIME)
-        pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
+        try:
+            pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
+        except exc:
+            print(exc)
         for job in pulled_jobs.jobs:
             try:
                 print("Gotcha!Learning...")

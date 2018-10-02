@@ -16,5 +16,14 @@ spec:
     spec:
       containers:
       - name: hyperopt-worker
-        image: musinov/hyperopt-worker
+        image: registry.gitlab.com/lambda-hse/registry/hyperoptworker
         imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "4"
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+      imagePullSecrets:
+      - name: gitlab-auth
