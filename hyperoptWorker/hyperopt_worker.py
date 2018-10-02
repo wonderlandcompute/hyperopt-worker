@@ -185,16 +185,13 @@ def main():
         time.sleep(SLEEP_TIME)
         try:
             pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
-        except exc:
-            print(exc)
-        for job in pulled_jobs.jobs:
-            try:
+            for job in pulled_jobs.jobs:
                 print("Gotcha!Learning...")
                 process_job(job)
-            except Exception as exc:
-                print("Error!\n")
-                print(exc)
-            print("Processed:\n{}".format(job))
+                print("Processed:\n{}".format(job))
+        except Exception as exc:
+            print("Error!\n")
+            print(exc)
 
 
 if __name__ == '__main__':
