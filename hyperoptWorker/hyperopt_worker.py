@@ -15,6 +15,7 @@ from hyperopt import STATUS_OK, STATUS_FAIL
 from modelgym.utils.evaluation import crossval_fit_eval
 from azure.storage.file import FileService
 import time
+import logging
 
 # TODO implement non-modegym learning.
 # TODO combine MODEL_CLASSES and MODEL_PATH into one obj with the following struct model={'CtBClassifier':{model: 'CtBClassifier', path: 'path_to_exported_model.pickle'}}
@@ -46,7 +47,6 @@ PREDEFINED_METRICS = {
 }
 
 MODEL_FILE = "model.pickle"
-SLEEP_TIME = 5  # seconds
 stub = new_client()
 file_service = FileService(account_name='mylake',
                            account_key='nTYA+KhHEIuy2DVyG8uGuNev3qKGJ8Qm975hCkMgm+hGc7AW17RhnygFTKSNho5Iu8s3zwYcqxgrmte0tROBog==')
@@ -102,8 +102,8 @@ def load_data(csv_path):
 def process_job(job):
     input = json.loads(job.input)
     out_folder = Path(input["model_path"]).parent
-    data_path = download(input["data_path"])
-    model_path = download(input["model_path"])
+    data_path = afs_download(input["data_path"])
+    model_path = afs_download(input["model_path"])
     try:
         train_target, train_objects = load_data(data_path)
         dataset = XYCDataset(train_objects, train_target)
@@ -112,7 +112,6 @@ def process_job(job):
         cv = dataset.cv_split(models['cv'])
 
         for model in models['models']:
-
             if MODEL_CLASSES.get(model['type']):
                 metrics = [PREDEFINED_METRICS.get(metric)() for metric in models['metrics']]
                 result = crossval_fit_eval(model_type=MODEL_CLASSES[model['type']],
@@ -122,9 +121,6 @@ def process_job(job):
                                            verbose=False)
 
                 res_model = MODEL_CLASSES[model['type']](params=model.get('params')).fit(dataset)
-                # with open(out_folder / MODEL_FILE, 'wb') as f:
-                #     pickle.dump(res_model, f)
-
             else:
                 raise NotImplementedError('Classifier %s is not supported')
 
@@ -136,8 +132,8 @@ def process_job(job):
         if model['type'] in (MODEL_CLASSES['CtBClassifier'], MODEL_CLASSES['CtBRegressor']):
             cleanup_catboost()
 
-        upload(pickle.dumps(res_model), out_folder / 'model.pickle')
-        upload(json.dumps(result).encode(), out_folder / 'output.json')
+        afs_upload(pickle.dumps(res_model), out_folder / 'model.pickle')
+        afs_upload(json.dumps(result).encode(), out_folder / 'output.json')
 
         job.output = json.dumps({'output': str(out_folder / 'output.json'),
                                  'result_model_path': str(out_folder / 'model.pickle')})
@@ -145,10 +141,10 @@ def process_job(job):
         job.status = Job.COMPLETED
         stub.ModifyJob(job)
     except Exception as exc:
-        print(str(exc))
+        logging.exception(str(exc))
         traceback.print_exc()
         log = "Error:\n" + str(exc) + "\n\n\nTrace:\n" + traceback.format_exc()
-        upload(str(log).encode(), out_folder / 'error.log')
+        afs_upload(str(log).encode(), out_folder / 'error.log')
         job.output = json.dumps({'error': str(out_folder / 'error.log')})
         job.status = wonderland_pb2.Job.FAILED
         stub.ModifyJob(job)
@@ -157,11 +153,17 @@ def process_job(job):
     return
 
 
-def download(afs_path):
+def afs_download(afs_path):
+    """Downloads from AFS
+
+    :param afs_path: relative path for data in the AFS share
+    :return:
+    """
+    logging.info("Downloading file from the AFS")
     afs_path = Path(afs_path)
     local_path = repo_storage / afs_path
     if local_path.exists():
-        print("Wow, the data is already here. Getting the data from the pantry.")
+        logging.info("Wow, the data is already here. Getting the data from the pantry.")
         return local_path
     else:
         path_to_folder = local_path.parent
@@ -170,28 +172,48 @@ def download(afs_path):
                                   directory_name=afs_path.parent,
                                   file_name=afs_path.name,
                                   file_path=local_path)
+    logging.info("Downloading was finished")
     return local_path
 
 
-def upload(bytes, afs_path):
+def afs_upload(bytes, afs_path):
+    """Uploads to the AFS
+
+    :param <bute> bytes: data
+    :param <string> afs_path: relative path for data in the AFS share
+    :return:
+    """
     file_service.create_file_from_bytes(share_name=os.getenv("AFSSHARE"),
                                         directory_name=afs_path.parent,
                                         file_name=afs_path.name,
                                         file=bytes)
 
 
+def sleep_at_work(last_work):
+    if time.time() - last_work < 10:
+        time.sleep(1)
+        return
+    if time.time() - last_work < 100:
+        time.sleep(5)
+        return
+    time.sleep(5)
+
+
 def main():
+    last_work = time.time()
+    logging.basicConfig(level=logging.INFO)
     while True:
-        time.sleep(SLEEP_TIME)
+        sleep_at_work(last_work)
         try:
+            logging.info("Knock, knock, wonderland")
             pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
             for job in pulled_jobs.jobs:
-                print("Gotcha!Learning...")
+                last_work = time.time()
+                logging.info("Gotcha!Learning...JOB_ID={}\n".format(job.id))
                 process_job(job)
-                print("Processed:\n{}".format(job))
+                logging.info("Processed:\n{}".format(job))
         except Exception as exc:
-            print("Error!\n")
-            print(exc)
+            logging.exception(exc)
 
 
 if __name__ == '__main__':
