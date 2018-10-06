@@ -6,5 +6,6 @@ from .wonderland_pb2 import (
 )
 
 from .util import (
-    new_client
+    new_client,
+    logbar
 )

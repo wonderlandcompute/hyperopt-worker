@@ -1,5 +1,6 @@
 from hyperoptWorker import wonderland_pb2
-from hyperoptWorker import Job, ListJobsRequest, new_client
+from hyperoptWorker import Job, ListJobsRequest
+from hyperoptWorker.util import new_client, logbar
 import base64
 import os
 import json
@@ -16,6 +17,8 @@ from modelgym.utils.evaluation import crossval_fit_eval
 from azure.storage.file import FileService
 import time
 import logging
+from multiprocessing import cpu_count
+
 
 # TODO implement non-modegym learning.
 # TODO combine MODEL_CLASSES and MODEL_PATH into one obj with the following struct model={'CtBClassifier':{model: 'CtBClassifier', path: 'path_to_exported_model.pickle'}}
@@ -93,18 +96,18 @@ def cleanup_catboost():
 
 def load_data(csv_path):
     """Loads train data from CSV file specified by its path. The target column must be 'y' """
-    dataframe = pd.read_csv(csv_path)
-    train_target = dataframe['y'].values
-    train_objects = dataframe.drop(['y'], axis=1).values
+    df = pd.read_csv(csv_path)
+    train_target = df['y'].values
+    train_objects = df.drop(['y'], axis=1).values
     return train_target, train_objects
 
 
 def process_job(job):
-    input = json.loads(job.input)
-    out_folder = Path(input["model_path"]).parent
-    data_path = afs_download(input["data_path"])
-    model_path = afs_download(input["model_path"])
     try:
+        input = json.loads(job.input)
+        out_folder = Path(input["model_path"]).parent
+        data_path = afs_download(input["data_path"])
+        model_path = afs_download(input["model_path"])
         train_target, train_objects = load_data(data_path)
         dataset = XYCDataset(train_objects, train_target)
         with open(model_path, "rb") as f:
@@ -141,7 +144,7 @@ def process_job(job):
         job.status = Job.COMPLETED
         stub.ModifyJob(job)
     except Exception as exc:
-        logging.exception(str(exc))
+        logging.warning(str(exc))
         traceback.print_exc()
         log = "Error:\n" + str(exc) + "\n\n\nTrace:\n" + traceback.format_exc()
         afs_upload(str(log).encode(), out_folder / 'error.log')
@@ -171,7 +174,9 @@ def afs_download(afs_path):
     file_service.get_file_to_path(share_name=os.getenv("AFSSHARE"),
                                   directory_name=afs_path.parent,
                                   file_name=afs_path.name,
-                                  file_path=local_path)
+                                  file_path=local_path,
+                                  max_connections=cpu_count(),
+                                  progress_callback=logbar)
     logging.info("Downloading was finished")
     return local_path
 
@@ -186,7 +191,9 @@ def afs_upload(bytes, afs_path):
     file_service.create_file_from_bytes(share_name=os.getenv("AFSSHARE"),
                                         directory_name=afs_path.parent,
                                         file_name=afs_path.name,
-                                        file=bytes)
+                                        file=bytes,
+                                        max_connections=cpu_count(),
+                                        progress_callback=logbar)
 
 
 def sleep_at_work(last_work):
@@ -201,11 +208,14 @@ def sleep_at_work(last_work):
 
 def main():
     last_work = time.time()
-    logging.basicConfig(level=logging.INFO)
+    if os.getenv("DEBUG") == "True":
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
     while True:
         sleep_at_work(last_work)
         try:
-            logging.info("Knock, knock, wonderland")
+            logging.debug("Knock, knock, wonderland")
             pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
             for job in pulled_jobs.jobs:
                 last_work = time.time()
@@ -213,7 +223,7 @@ def main():
                 process_job(job)
                 logging.info("Processed:\n{}".format(job))
         except Exception as exc:
-            logging.exception(exc)
+            logging.warning(exc)
 
 
 if __name__ == '__main__':
