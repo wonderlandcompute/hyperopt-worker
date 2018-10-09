@@ -64,26 +64,11 @@ def check_jobs_equal(a, b):
     return (a.project == b.project) and (a.id == b.id) and (a.status == b.status) and (
         a.metadata == b.metadata) and (a.kind == b.kind) and (a.output == b.output) and (a.input == b.input)
 
-# def generate_data(file,
-#                   n_samples=1000,
-#                   n_features=20,
-#                   n_informative=10,
-#                   n_classes=2):
-#     X, y = make_classification(n_samples=n_samples,
-#                                n_features=n_features,
-#                                n_informative=n_informative,
-#                                n_classes=n_classes)
-#     dataset = data(X, y)
-#     y = np.array([y])
-#     data = np.concatenate((X, y.T), axis=1)
-#     np.savetxt(file, data,
-#                fmt='%.2f',
-#                header=','.join([str(x) for x in range(n_features)] + ['y']),
-#                delimiter=',')
-#     return dataset
-
 
 def logbar(current, total):
     done = int(50.0 * current / total)
-    sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50 - done)))
+    sys.stdout.write("\r[%s%s]\n" % ('=' * done, ' ' * (50 - done)))
+    if current == total:
+        sys.stdout.write("\n")
     sys.stdout.flush()
+
