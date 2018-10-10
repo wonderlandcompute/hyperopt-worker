@@ -76,4 +76,4 @@ COPY certs/* /certs/
 COPY config.yaml /config.yaml
 RUN pip --no-cache install /hyperopt-worker
 
-CMD [ "python", "/hyperopt-worker/hyperoptWorker/hyperopt_worker.py"]
+ENTRYPOINT python /hyperopt-worker/hyperoptWorker/hyperopt_worker.py
