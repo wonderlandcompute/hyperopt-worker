@@ -1,11 +1,9 @@
 import os
-import grpc
+import sys
 import yaml
 from pathlib import Path
-import numpy as np
-import pandas as pd
-from sklearn.datasets import make_classification
-import sys
+
+import grpc
 
 from .wonderland_pb2_grpc import WonderlandStub
 

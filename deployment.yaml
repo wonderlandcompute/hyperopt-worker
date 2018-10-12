@@ -14,6 +14,7 @@ spec:
       labels:
         app: hyperopt
     spec:
+      restartPolicy: Never
       containers:
       - name: hyperopt-worker
         image: registry.gitlab.com/lambda-hse/registry/hyperoptworker

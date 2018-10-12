@@ -1,23 +1,26 @@
-from hyperoptWorker import wonderland_pb2
-from hyperoptWorker import Job, ListJobsRequest
-from hyperoptWorker.util import new_client, logbar
 import base64
 import os
 import json
 import shutil
 import traceback
-import pandas as pd
 import pickle
-import numpy as np
-from pathlib import Path
-import modelgym.metrics
-from modelgym.utils import XYCDataset
-from hyperopt import STATUS_OK, STATUS_FAIL
-from modelgym.utils.evaluation import crossval_fit_eval
-from azure.storage.file import FileService
 import time
 import logging
+import pandas as pd
+import numpy as np
+from pathlib import Path
 from multiprocessing import cpu_count
+
+from hyperopt import STATUS_OK
+from azure.storage.file import FileService
+
+import modelgym.metrics
+from modelgym.utils import XYCDataset
+from modelgym.utils.evaluation import crossval_fit_eval
+
+from . import wonderland_pb2
+from .wonderland_pb2 import Job, ListJobsRequest
+from .util import new_client, logbar
 
 
 # TODO implement non-modegym learning.
