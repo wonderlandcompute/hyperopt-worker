@@ -5,7 +5,7 @@ from pathlib import Path
 
 import grpc
 
-from .wonderland_pb2_grpc import WonderlandStub
+from hyperoptWorker.wonderland_pb2_grpc import WonderlandStub
 
 
 def new_client():

@@ -18,9 +18,8 @@ import modelgym.metrics
 from modelgym.utils import XYCDataset
 from modelgym.utils.evaluation import crossval_fit_eval
 
-from . import wonderland_pb2
-from .wonderland_pb2 import Job, ListJobsRequest
-from .util import new_client, logbar
+from hyperoptWorker.util import new_client, logbar, load_config
+from hyperoptWorker.wonderland_pb2 import Job, ListJobsRequest
 
 
 # TODO implement non-modegym learning.
@@ -52,13 +51,14 @@ PREDEFINED_METRICS = {
     # "r2": r2_score,
 }
 
+CONFIG = {}
 MODEL_FILE = "model.pickle"
-stub = new_client()
-file_service = FileService(account_name='mylake',
-                           account_key='nTYA+KhHEIuy2DVyG8uGuNev3qKGJ8Qm975hCkMgm+hGc7AW17RhnygFTKSNho5Iu8s3zwYcqxgrmte0tROBog==')
-os.environ["AFSSHARE"] = "myshare"
-os.environ["REPO_STORAGE"] = "~/repo-storage-worker"
-repo_storage = Path(os.getenv('REPO_STORAGE')).expanduser()
+##Do normal dynamic config !
+# os.environ["AFSSHARE"] = "yadro-share"
+# os.environ["REPO_STORAGE"] = "~/repo-storage-worker"
+# repo_storage = Path(os.getenv('REPO_STORAGE')).expanduser()
+
+
 
 
 def get_metric_function(metric):
@@ -145,15 +145,15 @@ def process_job(job):
                                  'result_model_path': str(out_folder / 'model.pickle')})
 
         job.status = Job.COMPLETED
-        stub.ModifyJob(job)
+        CONFIG["stub"].ModifyJob(job)
     except Exception as exc:
         logging.warning(str(exc))
         traceback.print_exc()
         log = "Error:\n" + str(exc) + "\n\n\nTrace:\n" + traceback.format_exc()
         afs_upload(str(log).encode(), out_folder / 'error.log')
         job.output = json.dumps({'error': str(out_folder / 'error.log')})
-        job.status = wonderland_pb2.Job.FAILED
-        stub.ModifyJob(job)
+        job.status = Job.FAILED
+        CONFIG["stub"].ModifyJob(job)
         return
 
     return
@@ -167,14 +167,14 @@ def afs_download(afs_path):
     """
     logging.info("Downloading file from the AFS")
     afs_path = Path(afs_path)
-    local_path = repo_storage / afs_path
+    local_path = CONFIG["repo_storage"] / afs_path
     if local_path.exists():
         logging.info("Wow, the data is already here. Getting the data from the pantry.")
         return local_path
     else:
         path_to_folder = local_path.parent
         path_to_folder.mkdir(parents=True, exist_ok=True)
-    file_service.get_file_to_path(share_name=os.getenv("AFSSHARE"),
+    CONFIG["file_service"].get_file_to_path(share_name=os.getenv(CONFIG["azurefs_share"]),
                                   directory_name=afs_path.parent,
                                   file_name=afs_path.name,
                                   file_path=local_path,
@@ -191,7 +191,7 @@ def afs_upload(bytes, afs_path):
     :param <string> afs_path: relative path for data in the AFS share
     :return:
     """
-    file_service.create_file_from_bytes(share_name=os.getenv("AFSSHARE"),
+    CONFIG["file_service"].create_file_from_bytes(share_name=os.getenv(CONFIG["azurefs_share"]),
                                         directory_name=afs_path.parent,
                                         file_name=afs_path.name,
                                         file=bytes,
@@ -210,6 +210,15 @@ def sleep_at_work(last_work):
 
 
 def main():
+    global CONFIG
+    CONFIG = load_config(os.getenv("WONDERCOMPUTECONFIG"))
+    for param, val in CONFIG.items():
+        print(param + ":", val)
+    CONFIG["stub"] = new_client()
+    CONFIG["repo_storage"] = Path(CONFIG["repo_storage"]).expanduser()
+    CONFIG["file_service"] = FileService(account_name=CONFIG["azurefs_acc_name"],
+                               account_key=CONFIG["azurefs_acc_key"])
+    
     last_work = time.time()
     if os.getenv("DEBUG") == "True":
         logging.basicConfig(level=logging.DEBUG)
@@ -219,7 +228,7 @@ def main():
         sleep_at_work(last_work)
         try:
             logging.debug("Knock, knock, wonderland")
-            pulled_jobs = stub.PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
+            pulled_jobs = CONFIG["stub"].PullPendingJobs(ListJobsRequest(how_many=1, kind='hyperopt'))
             for job in pulled_jobs.jobs:
                 last_work = time.time()
                 logging.info("Gotcha!Learning...JOB_ID={}\n".format(job.id))

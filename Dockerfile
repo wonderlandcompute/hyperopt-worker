@@ -72,7 +72,7 @@ ENV LANG=en_US.UTF-8 \
 
 COPY hyperoptWorker/*.py /hyperopt-worker/hyperoptWorker/
 COPY setup.py /hyperopt-worker
-COPY certs/* /certs/
+COPY certs/* /certificates/
 COPY config.yaml /config.yaml
 RUN pip --no-cache install /hyperopt-worker
 
