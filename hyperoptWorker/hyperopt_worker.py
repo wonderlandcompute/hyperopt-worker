@@ -174,7 +174,7 @@ def afs_download(afs_path):
     else:
         path_to_folder = local_path.parent
         path_to_folder.mkdir(parents=True, exist_ok=True)
-    CONFIG["file_service"].get_file_to_path(share_name=os.getenv(CONFIG["azurefs_share"]),
+    CONFIG["file_service"].get_file_to_path(share_name=CONFIG["azurefs_share"],
                                   directory_name=afs_path.parent,
                                   file_name=afs_path.name,
                                   file_path=local_path,
@@ -191,7 +191,7 @@ def afs_upload(bytes, afs_path):
     :param <string> afs_path: relative path for data in the AFS share
     :return:
     """
-    CONFIG["file_service"].create_file_from_bytes(share_name=os.getenv(CONFIG["azurefs_share"]),
+    CONFIG["file_service"].create_file_from_bytes(share_name=CONFIG["azurefs_share"],
                                         directory_name=afs_path.parent,
                                         file_name=afs_path.name,
                                         file=bytes,

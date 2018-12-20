@@ -66,14 +66,13 @@ RUN pip install protobuf
 RUN mkdir ~/repo-storage-worker/test -p
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
-    AFSSHARE="myshare" \
-    WONDERCOMPUTECONFIG="/config.yaml" \
+    WONDERLAND_CLIENT_CONFIG="/config.yml" \
     REPO_STORAGE="~/repo-storage-worker"
 
 COPY hyperoptWorker/*.py /hyperopt-worker/hyperoptWorker/
 COPY setup.py /hyperopt-worker
-COPY certs/* /certificates/
-COPY config.yaml /config.yaml
+COPY certs/* /certs/
+COPY config.yml /config.yml
 RUN pip --no-cache install /hyperopt-worker
 
 ENTRYPOINT python /hyperopt-worker/hyperoptWorker/hyperopt_worker.py
